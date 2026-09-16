@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Админ-панель</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #241C24; --canvas: #FAF6F3; --surface: #FFFFFF;
+    --wine: #7A2E3D; --wine-dark: #5E2230; --gold: #B8935B;
+    --line: #E6DAD2; --muted: #8A7E82;
+    --status-new: #B8935B; --status-confirmed: #5B7A8C; --status-done: #4E8B5C; --status-cancelled: #A65C5C;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--canvas); color: var(--ink); font-family: 'Inter', sans-serif; padding-bottom: 70px; }
+  header { padding: 18px 16px 10px; }
+  header h1 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 22px; margin: 0; }
+
+  nav.tabs {
+    display: flex; position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface); border-top: 1px solid var(--line);
+    z-index: 40;
+  }
+  nav.tabs button {
+    flex: 1; padding: 12px 0 10px; border: none; background: none;
+    font-size: 12px; color: var(--muted); font-weight: 500;
+  }
+  nav.tabs button.active { color: var(--wine); }
+
+  section { display: none; padding: 0 16px 16px; }
+  section.active { display: block; }
+
+  .card-box {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px; margin-bottom: 10px;
+  }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .stat-box { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .stat-box .num { font-family: 'Fraunces', serif; font-size: 22px; color: var(--wine-dark); }
+  .stat-box .label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  h3.section-title { font-size: 14px; font-weight: 600; margin: 18px 0 8px; }
+
+  table.simple { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.simple th { text-align: left; color: var(--muted); font-weight: 500; font-size: 11px; padding-bottom: 6px; }
+  table.simple td { padding: 6px 0; border-top: 1px solid var(--line); }
+
+  .prod-row { display: flex; gap: 10px; }
+  .prod-row img { width: 56px; height: 72px; object-fit: cover; border-radius: 8px; background: #EFE7E1; flex-shrink: 0; }
+  .prod-row .details { flex: 1; min-width: 0; }
+  .prod-row .name { font-weight: 600; font-size: 14px; margin: 0 0 2px; }
+  .prod-row .meta { font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+  .prod-actions { display: flex; gap: 8px; margin-top: 6px; }
+  .prod-actions button, .variant-row button {
+    font-size: 12px; padding: 6px 10px; border-radius: 7px; border: 1px solid var(--line); background: #fff;
+  }
+  .prod-actions .danger { color: var(--status-cancelled); border-color: var(--status-cancelled); }
+
+  .variant-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 0; border-top: 1px solid var(--line); font-size: 12.5px;
+  }
+  .variant-row .qty-ctrl { display: flex; align-items: center; gap: 6px; }
+  .variant-row .qty-ctrl button { width: 24px; height: 24px; padding: 0; }
+  .variant-row .stock-low { color: var(--status-cancelled); font-weight: 600; }
+
+  .fab {
+    position: fixed; right: 16px; bottom: 74px; z-index: 45;
+    background: var(--wine); color: #fff; border: none; border-radius: 100px;
+    padding: 12px 18px; font-weight: 600; font-size: 13px; box-shadow: 0 8px 20px rgba(122,46,61,0.3);
+  }
+
+  .form-overlay {
+    position: fixed; inset: 0; background: rgba(36,28,36,0.45); display: none; z-index: 60;
+  }
+  .form-overlay.show { display: flex; align-items: flex-end; }
+  .form-sheet {
+    background: var(--surface); width: 100%; max-height: 88vh; overflow-y: auto;
+    border-radius: 18px 18px 0 0; padding: 18px; position: relative;
+  }
+  .form-sheet h2 { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 500; margin: 0 0 12px; }
+  .form-sheet .close { position: absolute; top: 14px; right: 16px; border: none; background: none; font-size: 18px; color: var(--muted); }
+
+  input.field, textarea.field, select.field {
+    width: 100%; padding: 11px 13px; border-radius: 9px; border: 1px solid var(--line);
+    font-size: 14px; margin-bottom: 9px; font-family: inherit; background: #fff;
+  }
+  label.small-label { font-size: 11px; color: var(--muted); display: block; margin: 8px 0 3px; }
+
+  .variant-add-row { display: flex; gap: 6px; margin-bottom: 8px; }
+  .variant-add-row input { flex: 1; margin-bottom: 0; }
+  .variant-add-row button { padding: 0 12px; border-radius: 9px; border: none; background: var(--wine); color: #fff; font-size: 13px; }
+
+  .primary-btn {
+    width: 100%; padding: 13px; border-radius: 10px; border: none;
+    background: var(--wine); color: #fff; font-size: 14.5px; font-weight: 600; margin-top: 8px;
+  }
+
+  .order-card { margin-bottom: 10px; }
+  .order-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .order-head .id { font-weight: 600; font-size: 14px; }
+  .status-badge {
+    font-size: 11px; padding: 3px 9px; border-radius: 100px; color: #fff; font-weight: 600;
+  }
+  .order-meta { font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+  .order-items { font-size: 12.5px; margin-bottom: 8px; }
+  .order-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .order-actions button { font-size: 11.5px; padding: 6px 10px; border-radius: 7px; border: 1px solid var(--line); background: #fff; }
+
+  .filter-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 10px; }
+  .filter-row button { flex: 0 0 auto; padding: 6px 12px; border-radius: 100px; border: 1px solid var(--line); background: #fff; font-size: 12px; }
+  .filter-row button.active { background: var(--wine); color: #fff; border-color: var(--wine); }
+
+  canvas#revenueChart { max-height: 180px; }
+</style>
+</head>
+<body>
+
+<header><h1>Управление магазином</h1></header>
+
+<!-- ТОВАРЫ -->
+<section id="tab-products" class="active">
+  <div id="productsList"></div>
+</section>
+<button class="fab" id="addProductFab" onclick="openProductForm()">+ Товар</button>
+
+<!-- ЗАКАЗЫ -->
+<section id="tab-orders">
+  <div class="filter-row" id="orderFilters"></div>
+  <div id="ordersList"></div>
+</section>
+
+<!-- СТАТИСТИКА -->
+<section id="tab-stats">
+  <div class="stat-grid" id="statGrid"></div>
+  <h3 class="section-title">Выручка по дням</h3>
+  <div class="card-box"><canvas id="revenueChart"></canvas></div>
+  <h3 class="section-title">Топ товаров</h3>
+  <div class="card-box">
+    <table class="simple" id="topProductsTable">
+      <thead><tr><th>Товар</th><th>Продано</th><th>Выручка</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <h3 class="section-title">Заканчивается на складе</h3>
+  <div class="card-box" id="lowStockBox"></div>
+</section>
+
+<nav class="tabs">
+  <button class="active" data-tab="products" onclick="switchTab('products')">Товары</button>
+  <button data-tab="orders" onclick="switchTab('orders')">Заказы</button>
+  <button data-tab="stats" onclick="switchTab('stats')">Статистика</button>
+</nav>
+
+<!-- Форма товара -->
+<div class="form-overlay" id="productFormOverlay">
+  <div class="form-sheet">
+    <button class="close" onclick="closeProductForm()">✕</button>
+    <h2 id="productFormTitle">Новый товар</h2>
+    <input type="hidden" id="editProductId">
+    <label class="small-label">Название</label>
+    <input class="field" id="pName" placeholder="Например: Платье миди «Ирис»">
+    <label class="small-label">Категория</label>
+    <input class="field" id="pCategory" list="categoryList" placeholder="Платья, Блузы, Верхняя одежда...">
+    <datalist id="categoryList"></datalist>
+    <label class="small-label">Цена, ₽</label>
+    <input class="field" id="pPrice" type="number" placeholder="3990">
+    <label class="small-label">Ссылка на фото</label>
+    <input class="field" id="pPhoto" placeholder="https://...">
+    <label class="small-label">Описание</label>
+    <textarea class="field" id="pDescription" rows="2" placeholder="Состав, посадка, уход"></textarea>
+
+    <label class="small-label">Варианты (размер / цвет / остаток)</label>
+    <div class="variant-add-row">
+      <input id="vSize" placeholder="S">
+      <input id="vColor" placeholder="Чёрный">
+      <input id="vStock" type="number" placeholder="10" style="max-width:70px;">
+      <button onclick="addVariantRow()">+</button>
+    </div>
+    <div id="variantsPreview"></div>
+
+    <button class="primary-btn" onclick="saveProduct()">Сохранить</button>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+tg?.ready(); tg?.expand();
+
+let allProducts = [];
+let allCategories = [];
+let pendingVariants = [];
+let orderFilter = null;
+
+function switchTab(name) {
+  document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.getElementById('addProductFab').style.display = name === 'products' ? 'block' : 'none';
+  if (name === 'orders') loadOrders();
+  if (name === 'stats') loadStats();
+}
+
+// ---------- ТОВАРЫ ----------
+async function loadProducts() {
+  const [pRes, cRes] = await Promise.all([fetch('/api/products/admin'), fetch('/api/products/categories')]);
+  allProducts = await pRes.json();
+  allCategories = await cRes.json();
+  document.getElementById('categoryList').innerHTML = allCategories.map(c => `<option value="${c.name}">`).join('');
+  renderProducts();
+}
+
+function renderProducts() {
+  const list = document.getElementById('productsList');
+  if (!allProducts.length) {
+    list.innerHTML = '<p style="color:var(--muted); text-align:center; padding:40px 0;">Пока нет товаров — добавьте первый</p>';
+    return;
+  }
+  list.innerHTML = allProducts.map(p => {
+    const totalStock = p.variants.reduce((s, v) => s + v.stock_qty, 0);
+    const variantsHtml = p.variants.map(v => `
+      <div class="variant-row">
+        <span>${v.size}, ${v.color} — <span class="${v.stock_qty <= 3 ? 'stock-low' : ''}">${v.stock_qty} шт</span></span>
+        <div class="qty-ctrl">
+          <button onclick="adjustStock(${v.id}, -1)">−</button>
+          <button onclick="adjustStock(${v.id}, 1)">+</button>
+        </div>
+      </div>
+    `).join('');
+    return `
+      <div class="card-box">
+        <div class="prod-row">
+          <img src="${p.photo_url || ''}" onerror="this.style.background='#EFE7E1'; this.src='';">
+          <div class="details">
+            <p class="name">${p.name} ${p.is_active ? '' : '<span style="color:var(--muted); font-weight:400;">(скрыт)</span>'}</p>
+            <p class="meta">${p.category_name || 'без категории'} · ${p.price} ₽ · остаток: ${totalStock}</p>
+            <div class="prod-actions">
+              <button onclick="editProduct(${p.id})">Изменить</button>
+              <button onclick="toggleActive(${p.id}, ${p.is_active ? 0 : 1})">${p.is_active ? 'Скрыть' : 'Показать'}</button>
+              <button class="danger" onclick="deleteProduct(${p.id})">Удалить</button>
+            </div>
+          </div>
+        </div>
+        ${variantsHtml}
+      </div>
+    `;
+  }).join('');
+}
+
+async function adjustStock(variantId, delta) {
+  await fetch(`/api/products/variants/${variantId}/stock`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ delta })
+  });
+  loadProducts();
+}
+
+async function toggleActive(id, is_active) {
+  const p = allProducts.find(x => x.id === id);
+  await fetch(`/api/products/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...p, is_active })
+  });
+  loadProducts();
+}
+
+async function deleteProduct(id) {
+  const confirmed = tg?.showConfirm ? await new Promise(r => tg.showConfirm('Удалить товар безвозвратно?', r)) : confirm('Удалить товар?');
+  if (!confirmed) return;
+  await fetch(`/api/products/${id}`, { method: 'DELETE' });
+  loadProducts();
+}
+
+function openProductForm() {
+  document.getElementById('productFormTitle').textContent = 'Новый товар';
+  document.getElementById('editProductId').value = '';
+  document.getElementById('pName').value = '';
+  document.getElementById('pCategory').value = '';
+  document.getElementById('pPrice').value = '';
+  document.getElementById('pPhoto').value = '';
+  document.getElementById('pDescription').value = '';
+  pendingVariants = [];
+  renderVariantsPreview();
+  document.getElementById('productFormOverlay').classList.add('show');
+}
+
+function editProduct(id) {
+  const p = allProducts.find(x => x.id === id);
+  document.getElementById('productFormTitle').textContent = 'Изменить товар';
+  document.getElementById('editProductId').value = p.id;
+  document.getElementById('pName').value = p.name;
+  document.getElementById('pCategory').value = p.category_name || '';
+  document.getElementById('pPrice').value = p.price;
+  document.getElementById('pPhoto').value = p.photo_url || '';
+  document.getElementById('pDescription').value = p.description || '';
+  pendingVariants = p.variants.map(v => ({ ...v, existing: true }));
+  renderVariantsPreview();
+  document.getElementById('productFormOverlay').classList.add('show');
+}
+
+function closeProductForm() { document.getElementById('productFormOverlay').classList.remove('show'); }
+
+function addVariantRow() {
+  const size = document.getElementById('vSize').value.trim();
+  const color = document.getElementById('vColor').value.trim();
+  const stock = parseInt(document.getElementById('vStock').value) || 0;
+  if (!size || !color) return;
+  pendingVariants.push({ size, color, stock_qty: stock });
+  document.getElementById('vSize').value = '';
+  document.getElementById('vColor').value = '';
+  document.getElementById('vStock').value = '';
+  renderVariantsPreview();
+}
+
+function removeVariantRow(idx) { pendingVariants.splice(idx, 1); renderVariantsPreview(); }
+
+function renderVariantsPreview() {
+  document.getElementById('variantsPreview').innerHTML = pendingVariants.map((v, idx) => `
+    <div class="variant-row">
+      <span>${v.size}, ${v.color} — ${v.stock_qty} шт</span>
+      <button onclick="removeVariantRow(${idx})">✕</button>
+    </div>
+  `).join('');
+}
+
+async function saveProduct() {
+  const name = document.getElementById('pName').value.trim();
+  const price = parseFloat(document.getElementById('pPrice').value);
+  if (!name || !price) { tg?.showAlert ? tg.showAlert('Укажите название и цену') : alert('Укажите название и цену'); return; }
+
+  const categoryName = document.getElementById('pCategory').value.trim();
+  let category_id = null;
+  if (categoryName) {
+    const catRes = await fetch('/api/products/categories', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: categoryName })
+    });
+    const cat = await catRes.json();
+    category_id = cat.id;
+  }
+
+  const editId = document.getElementById('editProductId').value;
+  const body = {
+    name, price, category_id,
+    photo_url: document.getElementById('pPhoto').value.trim(),
+    description: document.getElementById('pDescription').value.trim(),
+  };
+
+  if (editId) {
+    await fetch(`/api/products/${editId}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...body, is_active: 1 })
+    });
+    for (const v of pendingVariants) {
+      if (!v.existing) {
+        await fetch(`/api/products/${editId}/variants`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v)
+        });
+      }
+    }
+  } else {
+    body.variants = pendingVariants;
+    await fetch('/api/products', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+  }
+
+  closeProductForm();
+  loadProducts();
+}
+
+// ---------- ЗАКАЗЫ ----------
+const statusLabels = { new: 'Новый', confirmed: 'Подтверждён', done: 'Выполнен', cancelled: 'Отменён' };
+const statusColors = { new: 'var(--status-new)', confirmed: 'var(--status-confirmed)', done: 'var(--status-done)', cancelled: 'var(--status-cancelled)' };
+
+function renderOrderFilters() {
+  const filters = [null, 'new', 'confirmed', 'done', 'cancelled'];
+  document.getElementById('orderFilters').innerHTML = filters.map(f => `
+    <button class="${orderFilter === f ? 'active' : ''}" onclick="setOrderFilter(${f ? `'${f}'` : null})">
+      ${f ? statusLabels[f] : 'Все'}
+    </button>
+  `).join('');
+}
+function setOrderFilter(f) { orderFilter = f; renderOrderFilters(); loadOrders(); }
+
+async function loadOrders() {
+  renderOrderFilters();
+  const url = orderFilter ? `/api/orders?status=${orderFilter}` : '/api/orders';
+  const res = await fetch(url);
+  const orders = await res.json();
+  const list = document.getElementById('ordersList');
+  if (!orders.length) {
+    list.innerHTML = '<p style="color:var(--muted); text-align:center; padding:30px 0;">Заказов пока нет</p>';
+    return;
+  }
+  list.innerHTML = orders.map(o => `
+    <div class="card-box order-card">
+      <div class="order-head">
+        <span class="id">Заказ №${o.id}</span>
+        <span class="status-badge" style="background:${statusColors[o.status]}">${statusLabels[o.status]}</span>
+      </div>
+      <div class="order-meta">${o.customer_name || 'Без имени'} · ${o.customer_phone || '—'} · ${o.total} ₽</div>
+      <div class="order-items">${o.items.map(i => `${i.product_name} (${i.size}, ${i.color}) × ${i.qty}`).join('<br>')}</div>
+      ${o.customer_comment ? `<div class="order-meta">💬 ${o.customer_comment}</div>` : ''}
+      <div class="order-actions">
+        ${o.status !== 'confirmed' && o.status !== 'done' ? `<button onclick="setOrderStatus(${o.id}, 'confirmed')">Подтвердить</button>` : ''}
+        ${o.status !== 'done' ? `<button onclick="setOrderStatus(${o.id}, 'done')">Выполнен</button>` : ''}
+        ${o.status !== 'cancelled' ? `<button onclick="setOrderStatus(${o.id}, 'cancelled')">Отменить</button>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function setOrderStatus(id, status) {
+  await fetch(`/api/orders/${id}/status`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status })
+  });
+  loadOrders();
+}
+
+// ---------- СТАТИСТИКА ----------
+let chartInstance = null;
+async function loadStats() {
+  const [ovRes, topRes, revRes] = await Promise.all([
+    fetch('/api/stats/overview'), fetch('/api/stats/top-products'), fetch('/api/stats/revenue-by-day')
+  ]);
+  const overview = await ovRes.json();
+  const top = await topRes.json();
+  const revenue = await revRes.json();
+
+  document.getElementById('statGrid').innerHTML = `
+    <div class="stat-box"><div class="num">${overview.totalRevenue} ₽</div><div class="label">Выручка всего</div></div>
+    <div class="stat-box"><div class="num">${overview.ordersCount}</div><div class="label">Заказов всего</div></div>
+    <div class="stat-box"><div class="num">${overview.newOrders}</div><div class="label">Новых заказов</div></div>
+    <div class="stat-box"><div class="num">${overview.lowStock.length}</div><div class="label">Позиций мало на складе</div></div>
+  `;
+
+  document.querySelector('#topProductsTable tbody').innerHTML = top.map(t => `
+    <tr><td>${t.product_name}</td><td>${t.total_qty}</td><td>${t.total_revenue} ₽</td></tr>
+  `).join('') || '<tr><td colspan="3" style="color:var(--muted)">Пока нет данных</td></tr>';
+
+  document.getElementById('lowStockBox').innerHTML = overview.lowStock.length
+    ? overview.lowStock.map(v => `<div class="variant-row"><span>${v.product_name} (${v.size}, ${v.color})</span><span class="stock-low">${v.stock_qty} шт</span></div>`).join('')
+    : '<p style="color:var(--muted); font-size:13px;">Всё в достатке</p>';
+
+  const ctx = document.getElementById('revenueChart');
+  if (chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: revenue.map(r => r.day.slice(5)),
+      datasets: [{ data: revenue.map(r => r.revenue), backgroundColor: '#7A2E3D', borderRadius: 4 }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, grid: { color: '#E6DAD2' } }, x: { grid: { display: false } } }
+    }
+  });
+}
+
+loadProducts();
+</script>
+</body>
+</html>
