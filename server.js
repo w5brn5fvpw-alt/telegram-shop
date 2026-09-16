@@ -33,7 +33,7 @@ app.use('/api/products', productsRouter);
 app.use('/api/orders', ordersRouterFactory(bot, ADMIN_IDS));
 app.use('/api/stats', statsRouter);
 
-app.listen(PORT, () => {
+app.listen(PORT,'0.0.0.0', () => {
   console.log(`Сервер запущен на порту ${PORT}`);
 });
 
