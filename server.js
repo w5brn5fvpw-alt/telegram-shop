@@ -37,7 +37,5 @@ app.listen(PORT,'0.0.0.0', () => {
   console.log(`Сервер запущен на порту ${PORT}`);
 });
 
-bot.launch().then(() => console.log('Telegram-бот запущен'));
-
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
