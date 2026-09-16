@@ -26,6 +26,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'webapp')));
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'webapp', 'index.html'));
+});
 
 const bot = createBot(BOT_TOKEN, WEBAPP_URL, ADMIN_IDS);
 
